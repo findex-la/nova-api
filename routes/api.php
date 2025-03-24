@@ -1,8 +1,7 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use \:namespace_vendor\:namespace_tool_name\Http\Controllers\ToolController;
+use Opscale\NovaAPI\Http\Controllers\ToolController;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,4 +14,4 @@ use \:namespace_vendor\:namespace_tool_name\Http\Controllers\ToolController;
 |
 */
 
-Route::get('test-case', [ToolController::class, 'index']);
+Route::get('test-case', [ToolController::class, 'test']);

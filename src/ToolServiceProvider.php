@@ -1,28 +1,24 @@
 <?php
 
-namespace :namespace_vendor\:namespace_tool_name;
+namespace Opscale\NovaAPI;
 
-use Laravel\Nova\Events\ServingNova;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use :namespace_vendor\:namespace_tool_name\Http\Middleware\Authorize;
+use Laravel\Nova\Events\ServingNova;
 use Laravel\Nova\Nova;
+use Opscale\NovaAPI\Http\Controllers\APIController;
+use Opscale\NovaAPI\Http\Middleware\Authorize;
+use Orion\Facades\Orion;
 
 class ToolServiceProvider extends ServiceProvider
 {
     public function boot()
     {
         $this->loadRoutes();
-        /*$this->loadConfigs();
 
-        if ($this->app->runningInConsole()) {
-            $this->loadCommands();
-            $this->loadMigrations();
-        }
-            
         Nova::serving(function (ServingNova $event) {
             $this->loadResources();
-        });*/
+        });
     }
 
     public function register()
@@ -30,9 +26,11 @@ class ToolServiceProvider extends ServiceProvider
         //
     }
 
-    /*protected function loadResources()
+    protected function loadResources()
     {
-        Nova::resources([]);
+        Nova::resources([
+            \Opscale\NovaAPI\Nova\AccessToken::class,
+        ]);
     }
 
     protected function loadRoutes()
@@ -42,29 +40,14 @@ class ToolServiceProvider extends ServiceProvider
         }
 
         Route::middleware(['nova', Authorize::class])
-                ->prefix('nova-vendor/:vendor/:package_name')
-                ->group(__DIR__.'/../routes/api.php');
-    }
-                
-    protected function loadConfigs()
-    {
-        $filename = ':package_name.php';
-        $this->publishes([
-            __DIR__."/../config/$filename" => config_path($filename),
-        ]);
-    }
+            ->prefix('nova-vendor/opscale-co/nova-api')
+            ->group(__DIR__ . '/../routes/api.php');
 
-    protected function loadCommands()
-    {
-        $this->commands([]);
+        $resources = appResources();
+        Route::prefix('api')->group(function () use ($resources) {
+            foreach ($resources as $resource) {
+                Orion::resource($resource::uriKey(), APIController::class);
+            }
+        });
     }
-
-    protected function loadMigrations()
-    {
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
-
-        $this->publishesMigrations([
-            __DIR__.'/../database/migrations' => database_path('migrations'),
-        ]);
-    }*/
 }

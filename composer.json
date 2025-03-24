@@ -1,6 +1,7 @@
 {
-    "name": ":vendor/:package_name",
-    "description": ":package_description",
+    "name": "opscale-co/nova-api",
+    "description": "Add default secured CRUD API endpoints for your Nova resources.",
+    "version": "1.0.0",
     "keywords": [
         "laravel",
         "nova",
@@ -14,33 +15,38 @@
             "url": "https://nova.laravel.com"
         }
     ],
-    "homepage": "https://github.com/:vendor/:package_name",
+    "homepage": "https://github.com/opscale-co/nova-api",
     "license": "MIT",
     "authors": [
         {
-            "name": ":author_name",
-            "email": ":author_email",
+            "name": "Opscale",
+            "email": "development@opscale.co",
             "role": "Developer"
         }
     ],
     "require": {
         "php": ">=8.2",
-        "ext-readline": "*"
+        "ext-readline": "*",
+        "laravel/sanctum": "^4.0",
+        "tailflow/laravel-orion": "^2.23"
     },
     "autoload": {
         "psr-4": {
-            ":namespace_vendor\\:namespace_tool_name\\": "src/"
-        }
+            "Opscale\\NovaAPI\\": "src/"
+        },
+        "files": [
+            "src/helpers.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
-            ":namespace_vendor\\:namespace_tool_name\\Tests\\": "tests"
+            "Opscale\\NovaAPI\\Tests\\": "tests"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                ":namespace_vendor\\:namespace_tool_name\\ToolServiceProvider"
+                "Opscale\\NovaAPI\\ToolServiceProvider"
             ]
         }
     },

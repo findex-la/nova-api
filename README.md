@@ -40,6 +40,10 @@ composer require opscale-co/nova-api
 
 Next up, you must register the tool with Nova. This is typically done in the `tools` method of the `NovaServiceProvider`.
 
+Remember to execute:
+
+`php artisan install:api`
+
 ```php
 
 // in app/Providers/NovaServiceProvider.php
@@ -53,10 +57,13 @@ public function tools()
 }
 
 ```
+This package uses [Orion](https://orion.tailflow.org/) and [Laravel Sanctum](https://laravel.com/docs/master/sanctum) internally to automatically create controllers for serving, requests for validating and policies for securing API for your Nova resources. Any further configuration can be done publishing the configuration file using:
+
+`php artisan vendor:publish --tag=orion-config`
 
 ## Usage
 
-Click on the "nova-api" menu item in your Nova app to see the tool provided by this package.
+You will see a "API Tokens" item in your menu by default. You can create your API Tokens here and you cab use them for any CRUD operation. 
 
 ## Testing
 

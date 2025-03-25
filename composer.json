@@ -1,7 +1,7 @@
 {
     "name": "opscale-co/nova-api",
     "description": "Add default secured CRUD API endpoints for your Nova resources.",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "keywords": [
         "laravel",
         "nova",

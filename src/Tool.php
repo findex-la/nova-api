@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Laravel\Nova\Menu\MenuItem;
 use Laravel\Nova\Nova;
 use Laravel\Nova\Tool as NovaTool;
-use Opscale\NovaAPI\Models\AccessToken;
+use Opscale\NovaAPI\Nova\AccessToken;
 
 class Tool extends NovaTool
 {

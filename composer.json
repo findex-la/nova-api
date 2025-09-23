@@ -1,7 +1,7 @@
 {
     "name": "opscale-co/nova-api",
     "description": "Add default secured CRUD API endpoints for your Nova resources.",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "keywords": [
         "laravel",
         "nova",
@@ -29,21 +29,23 @@
     ],
     "require": {
         "php": ">=8.2",
-        "ext-readline": "*",
         "laravel/sanctum": "^4.0",
-        "tailflow/laravel-orion": "^2.23"
+        "lorisleiva/laravel-actions": "^2.9",
+        "opscale-co/nova-package-tools": "^1.0",
+        "tailflow/laravel-orion": "^2.23",
+        "theriddleofenigma/laravel-model-validation": "^1.6"
     },
     "autoload": {
         "psr-4": {
             "Opscale\\NovaAPI\\": "src/"
-        },
-        "files": [
-            "src/helpers.php"
-        ]
+        }
     },
     "autoload-dev": {
         "psr-4": {
-            "Opscale\\NovaAPI\\Tests\\": "tests"
+            "Opscale\\NovaAPI\\Tests\\": "tests",
+            "Workbench\\App\\": "workbench/app/",
+            "Workbench\\Database\\Factories\\": "workbench/database/factories/",
+            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
         }
     },
     "extra": {
@@ -56,17 +58,42 @@
     "config": {
         "sort-packages": true
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true,
     "require-dev": {
+        "driftingly/rector-laravel": "^2.0",
+        "larastan/larastan": "^3.6",
         "laravel/nova": "^5.4",
         "laravel/nova-devtool": "^1.0",
+        "opscale-co/strict-rules": "^1.1",
         "phpunit/phpunit": "^10.5",
+        "rector/rector": "^2.1",
         "tightenco/duster": "^2.7"
     },
-    "script" : {
+    "script": {
         "post-autoload-dump": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+        ]
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "@clear",
+            "@prepare"
+        ],
+        "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
+        "prepare": "@php vendor/bin/testbench package:discover --ansi",
+        "build": "@php vendor/bin/testbench workbench:build --ansi",
+        "serve": [
+            "Composer\\Config::disableProcessTimeout",
+            "@build",
+            "@php vendor/bin/testbench serve --ansi"
+        ],
+        "lint": [
+            "@php vendor/bin/phpstan analyse --verbose --ansi"
+        ],
+        "test": [
+            "@clear",
+            "@php vendor/bin/phpunit"
         ]
     }
 }

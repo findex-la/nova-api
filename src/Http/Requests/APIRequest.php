@@ -6,21 +6,32 @@ use Orion\Http\Requests\Request;
 
 abstract class APIRequest extends Request
 {
-    abstract public function getResource();
+    abstract public function getResource(): string;
 
-    public function commonRules(): array
+    /**
+     * @return array<string, mixed>
+     */
+    final public function commonRules(): array
     {
+        $rules = parent::commonRules();
         $resource = $this->getResource();
-        $model = $resource::$model;
-        if (method_exists($model, 'rules')) {
-            return $model::rules();
-        } else {
-            return [];
-        }
-    }
 
-    public function storeRules(): array
-    {
-        return $this->commonRules();
+        if (! class_exists($resource) || ! property_exists($resource, 'model')) {
+            return $rules;
+        }
+
+        /** @var class-string<\Illuminate\Database\Eloquent\Model> $model */
+        $model = $resource::$model;
+
+        if (! class_exists($model)) {
+            return $rules;
+        }
+
+        $modelInstance = new $model;
+        if (! property_exists($modelInstance, 'validationRules')) {
+            return $rules;
+        }
+
+        return array_merge($rules, $modelInstance->validationRules);
     }
 }

@@ -1,0 +1,21 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - vendor/opscale-co/strict-rules/rules.clean.neon
+    - vendor/opscale-co/strict-rules/rules.ddd.neon
+    - vendor/opscale-co/strict-rules/rules.smells.neon
+    - vendor/opscale-co/strict-rules/rules.solid.neon
+parameters:
+    level: 9
+    phpVersion: 80200
+    paths:
+        - src
+        - tests
+        - workbench/app
+    excludePaths:
+        - tests/fixtures/*
+    ignoreErrors:
+        # Service providers follow Laravel's design patterns which may conflict with strict SOLID rules
+        # These patterns are intentional and part of the framework's architecture
+        -
+            message: '#.*#'
+            path: '*ServiceProvider.php'

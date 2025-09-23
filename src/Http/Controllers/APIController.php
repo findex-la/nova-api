@@ -2,105 +2,106 @@
 
 namespace Opscale\NovaAPI\Http\Controllers;
 
-use Exception;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
-use Opscale\NovaAPI\Http\Requests\APIRequest;
-use Opscale\NovaAPI\Policies\APIPolicy;
+use Illuminate\Support\Facades\Config;
 use Orion\Http\Controllers\Controller;
+use Symfony\Component\HttpFoundation\Response;
 
 class APIController extends Controller
 {
-    protected $resourceClass = null;
+    /**
+     * @var class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>|null
+     */
+    protected ?string $resourceClass = null;
 
-    public function __construct(Request $request)
+    final public function __construct(Request $request)
     {
         $this->model = $this->resolveModel($request);
         $this->request = $this->resolveRequest($request);
         $this->policy = $this->resolvePolicy($request);
-        parent::__construct($request);
+
+        // This constructror call must be at the end to ensure
+        // properties are set before parent constructor logic
+        parent::__construct();
     }
 
-    public function resolveUser()
+    /**
+     * @phpstan-ignore solid.lsp.parentCall
+     */
+    final public function resolveUser(): ?Authenticatable
     {
         return Auth::guard('sanctum')->user();
     }
 
-    public function resolveResource(Request $request)
+    /**
+     * @return class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>
+     */
+    final public function resolveResource(Request $request): string
     {
-        if ($this->resourceClass != null) {
+        if ($this->resourceClass !== null) {
             return $this->resourceClass;
-        } elseif (count($request->segments()) > 0) {
-            $segments = $request->segments();
-            $uriKey = end($segments);
-            $this->resourceClass = collect(appResources())
-                ->first(function ($resource) use ($uriKey) {
-                    return $resource::uriKey() === $uriKey;
-                });
-
-            return $this->resourceClass;
-        } else {
-            throw new Exception('Resource not found');
         }
+
+        $segments = $request->segments();
+        if (count($segments) < 2) {
+            (new JsonResponse(
+                ['error' => 'Resource not found'],
+                Response::HTTP_NOT_FOUND))->send();
+            exit;
+        }
+
+        // For routes like /api/users or /api/users/123, we want the second segment (users)
+        $uriKey = $segments[1];
+        /** @var array<int, class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>> $configuredResources */
+        $configuredResources = Config::get('nova-api.resources', []);
+        $resources = new Collection($configuredResources);
+
+        /** @var class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>|null $resourceClass */
+        $resourceClass = $resources
+            ->first(function (mixed $resource) use ($uriKey): bool {
+                /** @var class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>> $resource */
+                return $resource::uriKey() === $uriKey;
+            });
+
+        if ($resourceClass === null) {
+            (new JsonResponse(
+                ['error' => 'Resource not found'],
+                Response::HTTP_NOT_FOUND))->send();
+            exit;
+        }
+
+        $this->resourceClass = $resourceClass;
+
+        return $this->resourceClass;
     }
 
-    public function resolveRequest(Request $request): string
+    final public function resolveRequest(Request $request): string
     {
-        $class = get_class(new class extends APIRequest
-        {
-            protected $resource = null;
-
-            public function getResource()
-            {
-                return $this->resource;
-            }
-
-            public function setResource(string $resource)
-            {
-                $this->resource = $resource;
-            }
-        });
-
         $resource = $this->resolveResource($request);
-        App::singleton($class, function ($app) use ($class, $resource) {
-            $instance = new $class;
-            $instance->setResource($resource::uriKey());
+        $binding = $resource::uriKey() . '-request';
 
-            return $instance;
-        });
-
-        return $class;
+        return App::getAlias($binding);
     }
 
+    /**
+     * @phpstan-ignore solid.ocp.conditionalOverride
+     */
     public function resolvePolicy(Request $request): string
     {
-        $class = get_class(new class extends APIPolicy
-        {
-            protected $resource = null;
-
-            public function getResource()
-            {
-                return $this->resource;
-            }
-
-            public function setResource(string $resource)
-            {
-                $this->resource = $resource;
-            }
-        });
-
         $resource = $this->resolveResource($request);
-        App::singleton($class, function ($app) use ($class, $resource) {
-            $instance = new $class;
-            $instance->setResource($resource::uriKey());
+        $binding = $resource::uriKey() . '-policy';
 
-            return $instance;
-        });
-
-        return $class;
+        return App::getAlias($binding);
     }
 
+    /**
+     * @phpstan-ignore solid.ocp.conditionalOverride
+     */
     protected function resolveModel(Request $request): string
     {
         $resourceClass = $this->resolveResource($request);

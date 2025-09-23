@@ -2,64 +2,90 @@
 
 namespace Opscale\NovaAPI\Nova;
 
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Laravel\Nova\Fields\Date;
 use Laravel\Nova\Fields\DateTime;
+use Laravel\Nova\Fields\MorphTo;
 use Laravel\Nova\Fields\MultiSelect;
 use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Http\Requests\NovaRequest;
+use Laravel\Nova\Nova;
 use Laravel\Nova\Resource;
+use Laravel\Sanctum\HasApiTokens;
 use Opscale\NovaAPI\Models\AccessToken as Model;
-use Opscale\NovaAPI\Nova\Repeaters\Ability;
+use Opscale\NovaAPI\Nova\Repeatables\Ability;
+use Opscale\NovaAPI\Services\Actions\ConsumeToken;
 
+/**
+ * @extends Resource<Model>
+ */
 class AccessToken extends Resource
 {
-    public static $model = Model::class;
+    /**
+     * @var class-string<Model>
+     */
+    public static string $model = Model::class;
 
+    /**
+     * @var string
+     */
     public static $title = 'name';
 
+    /**
+     * @var array<int, string>
+     */
     public static $search = [
         'name',
     ];
 
-    public static function label()
+    final public static function label(): string
     {
         return _('API Tokens');
     }
 
-    public static function singularLabel()
+    final public static function singularLabel(): string
     {
         return _('API Token');
     }
 
-    public static function uriKey()
+    final public static function uriKey(): string
     {
         return _('api-tokens');
     }
 
-    public function fields(NovaRequest $request)
+    /**
+     * @return array<string, \Laravel\Nova\Fields\Field>
+     */
+    final public function defaultFields(NovaRequest $novaRequest): array
     {
         return [
-            Text::make(_('Name'), 'name')
-                ->rules(Model::rules('name'))
+            'name' => Text::make(_('Name'), 'name')
+                ->rules(fn (): array => $this->model()?->validationRules['name'] ?? [])
                 ->sortable(),
 
-            Date::make(_('Expiration'), 'expires_at')
+            'expires_at' => Date::make(_('Expiration'), 'expires_at')
                 ->nullable()
                 ->sortable()
                 ->filterable(),
 
-            DateTime::make(_('Last used'), 'last_used_at')
+            'last_used_at' => DateTime::make(_('Last used'), 'last_used_at')
                 ->exceptOnForms()
                 ->sortable()
                 ->filterable(),
 
-            DateTime::make(_('Created'), 'created_at')
+            'created_at' => DateTime::make(_('Created'), 'created_at')
                 ->exceptOnForms()
                 ->sortable()
                 ->filterable(),
 
-            Repeater::make(_('Abilities'), 'abilities')
+            'tokenable' => MorphTo::make(_('Consumer'), 'tokenable')
+                ->types($this->getTokenableResources())
+                ->onlyOnForms()
+                ->required(),
+
+            'abilities.create' => Repeater::make(_('Abilities'), 'abilities')
                 ->repeatables([
                     Ability::make(),
                 ])
@@ -67,21 +93,81 @@ class AccessToken extends Resource
                 ->onlyOnForms()
                 ->hideWhenUpdating(),
 
-            MultiSelect::make(_('Abilities'), 'abilities')
-                ->options(fn () => collect($this->resource->abilities)
-                    ->mapWithKeys(function ($ability) {
-                        return [$ability => $ability];
-                    }))
+            'abilities.update' => MultiSelect::make(_('Abilities'), 'abilities')
+                ->options(function (): Collection {
+                    if (! $this->resource) {
+                        return new Collection([]);
+                    }
+
+                    /** @var array<int, string>|null $abilities */
+                    $abilities = $this->resource->getAttribute('abilities');
+
+                    return (new Collection($abilities ?? []))
+                        ->mapWithKeys(function (string $ability): array {
+                            return [$ability => $ability];
+                        });
+                })
                 ->displayUsingLabels()
-                ->rules(Model::rules('abilities'))
+                ->rules(fn (): array => $this->model()?->validationRules['abilities'] ?? [])
                 ->hideWhenCreating()
                 ->hideFromIndex(),
-
-            Text::make(_('Token'),
-                fn () => cache()->get('opscale.api.token.' . $this->id))
-                ->copyable()
-                ->onlyOnDetail()
-                ->canSee(fn ($r) => cache()->has('opscale.api.token.' . $this->id)),
         ];
+    }
+
+    /**
+     * @return array<int, \Laravel\Nova\Fields\Field>
+     */
+    final public function fields(NovaRequest $request): array
+    {
+        return array_values(static::defaultFields($request));
+    }
+
+    /**
+     * @return array<int, \Laravel\Nova\Fields\Field>
+     */
+    final public function fieldsForDetail(NovaRequest $novaRequest): array
+    {
+        $fields = array_values(static::defaultFields($novaRequest));
+        $fields[] = Text::make(_('Token'),
+            function (): string {
+                if (! $this->resource) {
+                    return '';
+                }
+
+                /** @var string $token */
+                $token = ConsumeToken::run($this->resource->getKey());
+
+                return $token;
+            })
+            ->copyable()
+            ->onlyOnDetail()
+            ->canSee(function (Request $request): bool {
+                return $this->resource && ConsumeToken::run($this->resource->getKey()) !== '';
+            })
+            ->help(_('The token will only be shown for 5 minutes after created. Make sure to copy it now!'));
+
+        return $fields;
+    }
+
+    /**
+     * Get Nova resources that can create tokens (have HasApiTokens trait)
+     *
+     * @return array<class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>, string>
+     */
+    private function getTokenableResources(): array
+    {
+        /** @var array<class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>, string> $resources */
+        $resources = (new Collection(Nova::$resources))
+            ->filter(function (string $resource): bool {
+                /** @var class-string<\Laravel\Nova\Resource> $resource */
+                /** @var class-string<\Illuminate\Database\Eloquent\Model> $model */
+                $model = $resource::$model;
+                $traits = class_uses_recursive($model);
+
+                return in_array(HasApiTokens::class, $traits ?: [], true);
+            })
+            ->toArray();
+
+        return $resources;
     }
 }

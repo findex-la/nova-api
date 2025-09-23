@@ -2,49 +2,60 @@
 
 namespace Opscale\NovaAPI\Policies;
 
-use Exception;
 use Illuminate\Auth\Access\HandlesAuthorization;
+use Illuminate\Database\Eloquent\Model;
 
 abstract class APIPolicy
 {
     use HandlesAuthorization;
 
-    abstract public function getResource();
+    abstract public function getResource(): string;
 
-    public function create($user)
+    final public function create(
+        Model $model): bool
     {
-        return $this->checkAbility($user, null, 'create');
+        return $this->checkAbility($model, null, 'create');
     }
 
-    public function viewAny($user)
+    final public function viewAny(
+        Model $model): bool
     {
-        return $this->checkAbility($user, null, 'read');
+        return $this->checkAbility($model, null, 'read');
     }
 
-    public function view($user, $model)
+    final public function view(
+        Model $consumer,
+        Model $model): bool
     {
-        return $this->checkAbility($user, $model, 'read');
+        return $this->checkAbility($consumer, $model, 'read');
     }
 
-    public function update($user, $model)
+    final public function update(
+        Model $consumer,
+        Model $model): bool
     {
-        return $this->checkAbility($user, $model, 'update');
+        return $this->checkAbility($consumer, $model, 'update');
     }
 
-    public function delete($user, $model)
+    final public function delete(
+        Model $consumer,
+        Model $model): bool
     {
-        return $this->checkAbility($user, $model, 'delete');
+        return $this->checkAbility($consumer, $model, 'delete');
     }
 
-    protected function checkAbility($user, $model, $action)
+    final protected function checkAbility(
+        Model $consumer,
+        ?Model $model,
+        string $action): bool
     {
-        try {
-            $resource = $this->getResource();
-            $ability = "{$resource}:{$action}";
+        $resource = $this->getResource();
+        $ability = sprintf('%s:%s', $resource, $action);
 
-            return $user->tokenCan($ability);
-        } catch (Exception $e) {
+        if (method_exists($consumer, 'tokenCan') === false) {
             return false;
         }
+
+        return $consumer->tokenCan($ability);
     }
 }

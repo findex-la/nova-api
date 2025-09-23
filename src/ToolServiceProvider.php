@@ -2,52 +2,147 @@
 
 namespace Opscale\NovaAPI;
 
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\ServiceProvider;
-use Laravel\Nova\Events\ServingNova;
-use Laravel\Nova\Nova;
+use Opscale\NovaAPI\Console\Commands\SyncResources;
+use Opscale\NovaAPI\Events\AccessTokenGenerated;
 use Opscale\NovaAPI\Http\Controllers\APIController;
-use Opscale\NovaAPI\Http\Middleware\Authorize;
+use Opscale\NovaAPI\Http\Requests\APIRequest;
+use Opscale\NovaAPI\Nova\AccessToken;
+use Opscale\NovaAPI\Policies\APIPolicy;
+use Opscale\NovaAPI\Services\Actions\CacheToken;
+use Opscale\NovaPackageTools\NovaPackage;
+use Opscale\NovaPackageTools\NovaPackageServiceProvider;
 use Orion\Facades\Orion;
+use Spatie\LaravelPackageTools\Commands\InstallCommand;
+use Spatie\LaravelPackageTools\Package;
 
-class ToolServiceProvider extends ServiceProvider
+class ToolServiceProvider extends NovaPackageServiceProvider
 {
-    public function boot()
+    /**
+     * @phpstan-ignore solid.ocp.conditionalOverride
+     */
+    public function configurePackage(Package $package): void
     {
-        $this->loadRoutes();
-
-        Nova::serving(function (ServingNova $event) {
-            $this->loadResources();
-        });
+        /** @var NovaPackage $package */
+        $package
+            ->name('nova-api')
+            /** @phpstan-ignore argument.type */
+            ->hasResources([
+                AccessToken::class,
+            ])
+            ->hasConfigFile('nova-api')
+            ->hasCommand(SyncResources::class)
+            ->hasInstallCommand(function (InstallCommand $installCommand): void {
+                $installCommand
+                    ->publishConfigFile()
+                    ->askToStarRepoOnGitHub('opscale-co/nova-api');
+            });
     }
 
-    public function register()
+    final public function packageBooted(): void
     {
-        //
+        parent::packageBooted();
+        $this->registerAPIRoutes();
+        $this->registerAPIRequests();
+        $this->registerAPIPolicies();
+        $this->registerEventListeners();
     }
 
-    protected function loadResources()
+    final public function registerAPIRoutes(): void
     {
-        Nova::resources([
-            \Opscale\NovaAPI\Nova\AccessToken::class,
-        ]);
-    }
+        /** @var array<int, class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>> $configuredResources */
+        $configuredResources = config('nova-api.resources', []);
 
-    protected function loadRoutes()
-    {
-        if ($this->app->routesAreCached()) {
-            return;
-        }
+        /** @var Collection<int, class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>> $resources */
+        $resources = new Collection($configuredResources);
 
-        Route::middleware(['nova', Authorize::class])
-            ->prefix('nova-vendor/opscale-co/nova-api')
-            ->group(__DIR__ . '/../routes/api.php');
-
-        $resources = appResources();
-        Route::prefix('api')->group(function () use ($resources) {
+        Route::prefix('api')->middleware(['auth:sanctum'])->group(function () use ($resources): void {
             foreach ($resources as $resource) {
+                /** @var class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>> $resource */
                 Orion::resource($resource::uriKey(), APIController::class);
             }
         });
+    }
+
+    final public function registerAPIRequests(): void
+    {
+        /** @var array<int, class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>> $configuredResources */
+        $configuredResources = config('nova-api.resources', []);
+
+        /** @var Collection<int, class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>> $resources */
+        $resources = new Collection($configuredResources);
+
+        foreach ($resources as $resource) {
+            $class = get_class(new class extends APIRequest
+            {
+                protected ?string $resource = null;
+
+                public function getResource(): string
+                {
+                    return $this->resource ?? '';
+                }
+
+                public function setResource(string $resource): void
+                {
+                    $this->resource = $resource;
+                }
+            });
+
+            $binding = $resource::uriKey() . '-request';
+            $this->app->bindIf($binding, function ($app) use ($class, $resource): object {
+                $instance = new $class;
+                $instance->setResource($resource);
+
+                return $instance;
+            });
+        }
+
+    }
+
+    final public function registerAPIPolicies(): void
+    {
+        /** @var array<int, class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>> $configuredResources */
+        $configuredResources = config('nova-api.resources', []);
+
+        /** @var Collection<int, class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>> $resources */
+        $resources = new Collection($configuredResources);
+
+        foreach ($resources as $resource) {
+            $class = get_class(new class extends APIPolicy
+            {
+                protected ?string $resource = null;
+
+                public function getResource(): string
+                {
+                    return $this->resource ?? '';
+                }
+
+                public function setResource(string $resource): void
+                {
+                    $this->resource = $resource;
+                }
+            });
+
+            $binding = $resource::uriKey() . '-policy';
+            $this->app->bindIf($binding, function ($app) use ($class, $resource): object {
+                $instance = new $class;
+                $instance->setResource($resource::uriKey());
+
+                return $instance;
+            });
+        }
+    }
+
+    /**
+     * Register event listeners for the package
+     */
+    private function registerEventListeners(): void
+    {
+        Event::listen(
+            AccessTokenGenerated::class,
+            CacheToken::class
+        );
     }
 }

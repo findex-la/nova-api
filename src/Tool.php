@@ -10,13 +10,14 @@ use Opscale\NovaAPI\Nova\AccessToken;
 
 class Tool extends NovaTool
 {
-    public function boot()
+    final public function boot(): void
     {
+        parent::boot();
         Nova::script('nova-api', __DIR__ . '/../dist/js/tool.js');
         Nova::style('nova-api', __DIR__ . '/../dist/css/tool.css');
     }
 
-    public function menu(Request $request)
+    final public function menu(Request $request): MenuItem
     {
         return MenuItem::resource(AccessToken::class);
     }

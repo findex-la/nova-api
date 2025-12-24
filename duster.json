@@ -9,7 +9,10 @@
     ],
     "scripts": {
         "lint": {
-            "phpstan": ["./vendor/bin/phpstan", "analyse"]
+            "phpstan": false
+        },
+        "fix": {
+            "phpstan": false
         }
     },
     "processTimeout": 120

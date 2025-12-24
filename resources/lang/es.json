@@ -1,0 +1,19 @@
+{
+    "API Tokens": "Tokens de API",
+    "API Token": "Token de API",
+    "api-tokens": "tokens-de-api",
+    "Name": "Nombre",
+    "Expiration": "Vencimiento",
+    "Last used": "Ultimo uso",
+    "Created": "Creado",
+    "Consumer": "Consumidor",
+    "Abilities": "Permisos",
+    "Token": "Token",
+    "Resource": "Recurso",
+    "Actions": "Acciones",
+    "Create": "Crear",
+    "Read": "Leer",
+    "Update": "Actualizar",
+    "Delete": "Eliminar",
+    "Execute": "Ejecutar"
+}

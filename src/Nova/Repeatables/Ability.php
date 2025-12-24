@@ -24,18 +24,18 @@ class Ability extends Repeatable
             })->toArray();
 
         return array_merge(parent::fields($request), [
-            Select::make(_('Resource'), 'resource')
+            Select::make(__('Resource'), 'resource')
                 ->options($resources)
                 ->displayUsingLabels()
                 ->rules('required'),
 
-            MultiSelect::make(_('Actions'), 'actions')
+            MultiSelect::make(__('Actions'), 'actions')
                 ->options([
-                    'create' => _('Create'),
-                    'read' => _('Read'),
-                    'update' => _('Update'),
-                    'delete' => _('Delete'),
-                    'execute' => _('Execute'),
+                    'create' => __('Create'),
+                    'read' => __('Read'),
+                    'update' => __('Update'),
+                    'delete' => __('Delete'),
+                    'execute' => __('Execute'),
                 ])
                 ->displayUsingLabels()
                 ->rules('required'),

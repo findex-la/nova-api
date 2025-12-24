@@ -2,23 +2,26 @@
 
 namespace Opscale\NovaAPI\Http\Controllers;
 
+use Exception;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Validation\ValidationException;
 use Orion\Http\Controllers\Controller;
+use Orion\Http\Requests\Request as OrionRequest;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class APIController extends Controller
 {
-    /**
-     * @var class-string<\Laravel\Nova\Resource<\Illuminate\Database\Eloquent\Model>>|null
-     */
-    protected ?string $resourceClass = null;
-
     final public function __construct(Request $request)
     {
         $this->model = $this->resolveModel($request);
@@ -43,10 +46,6 @@ class APIController extends Controller
      */
     final public function resolveResource(Request $request): string
     {
-        if ($this->resourceClass !== null) {
-            return $this->resourceClass;
-        }
-
         $segments = $request->segments();
         if (count($segments) < 2) {
             (new JsonResponse(
@@ -75,9 +74,7 @@ class APIController extends Controller
             exit;
         }
 
-        $this->resourceClass = $resourceClass;
-
-        return $this->resourceClass;
+        return $resourceClass;
     }
 
     final public function resolveRequest(Request $request): string
@@ -88,10 +85,7 @@ class APIController extends Controller
         return App::getAlias($binding);
     }
 
-    /**
-     * @phpstan-ignore solid.ocp.conditionalOverride
-     */
-    public function resolvePolicy(Request $request): string
+    final public function resolvePolicy(Request $request): string
     {
         $resource = $this->resolveResource($request);
         $binding = $resource::uriKey() . '-policy';
@@ -99,13 +93,119 @@ class APIController extends Controller
         return App::getAlias($binding);
     }
 
+    final public function index(OrionRequest $request): ResourceCollection|JsonResponse
+    {
+        try {
+            return parent::index($request);
+        } catch (AuthorizationException $e) {
+            return $this->authorizationErrorResponse($e);
+        } catch (Exception $e) {
+            return $this->exceptionResponse($e);
+        }
+    }
+
+    final public function store(OrionRequest $request): JsonResource|JsonResponse
+    {
+        try {
+            return parent::store($request);
+        } catch (AuthorizationException $e) {
+            return $this->authorizationErrorResponse($e);
+        } catch (ValidationException $e) {
+            return $this->validationErrorResponse($e);
+        } catch (Exception $e) {
+            return $this->exceptionResponse($e);
+        }
+    }
+
     /**
-     * @phpstan-ignore solid.ocp.conditionalOverride
+     * @param  array<int, mixed>  $args
      */
-    protected function resolveModel(Request $request): string
+    final public function show(OrionRequest $request, mixed ...$args): JsonResource|JsonResponse
+    {
+        try {
+            return parent::show($request, ...$args);
+        } catch (AuthorizationException $e) {
+            return $this->authorizationErrorResponse($e);
+        } catch (ModelNotFoundException) {
+            return $this->errorResponse('Resource not found', Response::HTTP_NOT_FOUND);
+        } catch (Exception $e) {
+            return $this->exceptionResponse($e);
+        }
+    }
+
+    /**
+     * @param  array<int, mixed>  $args
+     */
+    final public function update(OrionRequest $request, mixed ...$args): JsonResource|JsonResponse
+    {
+        try {
+            return parent::update($request, ...$args);
+        } catch (AuthorizationException $e) {
+            return $this->authorizationErrorResponse($e);
+        } catch (ModelNotFoundException) {
+            return $this->errorResponse('Resource not found', Response::HTTP_NOT_FOUND);
+        } catch (ValidationException $e) {
+            return $this->validationErrorResponse($e);
+        } catch (Exception $e) {
+            return $this->exceptionResponse($e);
+        }
+    }
+
+    /**
+     * @param  array<int, mixed>  $args
+     */
+    final public function destroy(OrionRequest $request, mixed ...$args): JsonResource|JsonResponse
+    {
+        try {
+            return parent::destroy($request, ...$args);
+        } catch (AuthorizationException $e) {
+            return $this->authorizationErrorResponse($e);
+        } catch (ModelNotFoundException) {
+            return $this->errorResponse('Resource not found', Response::HTTP_NOT_FOUND);
+        } catch (Exception $e) {
+            return $this->exceptionResponse($e);
+        }
+    }
+
+    final protected function resolveModel(Request $request): string
     {
         $resourceClass = $this->resolveResource($request);
 
         return $resourceClass::$model;
+    }
+
+    private function errorResponse(string $message, int $statusCode): JsonResponse
+    {
+        return new JsonResponse(
+            ['error' => $message],
+            $statusCode
+        );
+    }
+
+    private function authorizationErrorResponse(AuthorizationException $e): JsonResponse
+    {
+        $statusCode = $e->status() ?? Response::HTTP_FORBIDDEN;
+
+        return $this->errorResponse($e->getMessage(), $statusCode);
+    }
+
+    private function validationErrorResponse(ValidationException $e): JsonResponse
+    {
+        return new JsonResponse(
+            [
+                'error' => 'Validation failed',
+                'errors' => $e->errors(),
+            ],
+            $e->status
+        );
+    }
+
+    private function exceptionResponse(Exception $e): JsonResponse
+    {
+        if ($e instanceof HttpExceptionInterface) {
+            return $this->errorResponse($e->getMessage(), $e->getStatusCode());
+        }
+
+        return $this->errorResponse($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
     }
 }

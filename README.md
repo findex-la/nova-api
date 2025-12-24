@@ -22,9 +22,7 @@ Add default secured CRUD API endpoints for your Nova resources.
 
 Integrations are everywhere, even managing your operations in your Nova app, external systems will need to communicate with your app for consuming data or keep records up to date. APIs are the best solution for that!
 
-![Token creation](https://raw.githubusercontent.com/opscale-co/nova-api/refs/heads/main/screenshots/token-creation.png)
-![Token detail](https://raw.githubusercontent.com/opscale-co/nova-api/refs/heads/main/screenshots/token-detail.png)
-![Token demo](https://raw.githubusercontent.com/opscale-co/nova-api/refs/heads/main/screenshots/token-demo.png)
+![API demo](https://raw.githubusercontent.com/opscale-co/nova-api/refs/heads/main/screenshots/nova-api.gif)
 
 ## Installation
 

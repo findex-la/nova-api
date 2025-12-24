@@ -42,17 +42,17 @@ class AccessToken extends Resource
 
     final public static function label(): string
     {
-        return _('API Tokens');
+        return __('API Tokens');
     }
 
     final public static function singularLabel(): string
     {
-        return _('API Token');
+        return __('API Token');
     }
 
     final public static function uriKey(): string
     {
-        return _('api-tokens');
+        return __('api-tokens');
     }
 
     /**
@@ -61,31 +61,31 @@ class AccessToken extends Resource
     final public function defaultFields(NovaRequest $novaRequest): array
     {
         return [
-            'name' => Text::make(_('Name'), 'name')
+            'name' => Text::make(__('Name'), 'name')
                 ->rules(fn (): array => $this->model()?->validationRules['name'] ?? [])
                 ->sortable(),
 
-            'expires_at' => Date::make(_('Expiration'), 'expires_at')
+            'expires_at' => Date::make(__('Expiration'), 'expires_at')
                 ->nullable()
                 ->sortable()
                 ->filterable(),
 
-            'last_used_at' => DateTime::make(_('Last used'), 'last_used_at')
+            'last_used_at' => DateTime::make(__('Last used'), 'last_used_at')
                 ->exceptOnForms()
                 ->sortable()
                 ->filterable(),
 
-            'created_at' => DateTime::make(_('Created'), 'created_at')
+            'created_at' => DateTime::make(__('Created'), 'created_at')
                 ->exceptOnForms()
                 ->sortable()
                 ->filterable(),
 
-            'tokenable' => MorphTo::make(_('Consumer'), 'tokenable')
+            'tokenable' => MorphTo::make(__('Consumer'), 'tokenable')
                 ->types($this->getTokenableResources())
                 ->onlyOnForms()
                 ->required(),
 
-            'abilities.create' => Repeater::make(_('Abilities'), 'abilities')
+            'abilities.create' => Repeater::make(__('Abilities'), 'abilities')
                 ->repeatables([
                     Ability::make(),
                 ])
@@ -93,7 +93,7 @@ class AccessToken extends Resource
                 ->onlyOnForms()
                 ->hideWhenUpdating(),
 
-            'abilities.update' => MultiSelect::make(_('Abilities'), 'abilities')
+            'abilities.update' => MultiSelect::make(__('Abilities'), 'abilities')
                 ->options(function (): Collection {
                     if (! $this->resource) {
                         return new Collection([]);
@@ -128,23 +128,35 @@ class AccessToken extends Resource
     final public function fieldsForDetail(NovaRequest $novaRequest): array
     {
         $fields = array_values(static::defaultFields($novaRequest));
-        $fields[] = Text::make(_('Token'),
+        $fields[] = Text::make(__('Token'),
             function (): string {
                 if (! $this->resource) {
                     return '';
                 }
 
-                /** @var string $token */
-                $token = ConsumeToken::run($this->resource->getKey());
+                /** @var int|string $key */
+                $key = $this->resource->getKey();
 
-                return $token;
+                /** @var array{token: string} $result */
+                $result = ConsumeToken::run(['tokenId' => (string) $key]);
+
+                return $result['token'];
             })
             ->copyable()
             ->onlyOnDetail()
             ->canSee(function (Request $request): bool {
-                return $this->resource && ConsumeToken::run($this->resource->getKey()) !== '';
-            })
-            ->help(_('The token will only be shown for 5 minutes after created. Make sure to copy it now!'));
+                if (! $this->resource) {
+                    return false;
+                }
+
+                /** @var int|string $key */
+                $key = $this->resource->getKey();
+
+                /** @var array{token: string} $result */
+                $result = ConsumeToken::run(['tokenId' => (string) $key]);
+
+                return $result['token'] !== '';
+            });
 
         return $fields;
     }
